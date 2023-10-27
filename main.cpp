@@ -86,23 +86,25 @@
 #define CONTENT_BYTE 0
 #define CONTENT_FLOAT 1
 #define CONTENT_DOUBLE 2
+#define CONTENT_LENGTH 32
+#define CONTENT_START 4
 // 4 bytes for any magic and identifier
 #define LOC_ID 0
-// 0V offsets (float values. 4 bytes each)
-#define LOC_BOARD0_AIN1_OFFSET 4
-#define LOC_BOARD0_AIN2_OFFSET 8
-#define LOC_BOARD1_AIN1_OFFSET 12
-#define LOC_BOARD1_AIN2_OFFSET 16
-// ADC gain settings (1 byte each)
-#define LOC_BOARD0_AIN1_GAIN 20
-#define LOC_BOARD0_AIN2_GAIN 21
-#define LOC_BOARD1_AIN1_GAIN 22
-#define LOC_BOARD1_AIN2_GAIN 23
-// op-amp gain settings (float values. 4 bytes each)
-#define LOC_BOARD0_AIN1_OPAMP_GAIN 24
-#define LOC_BOARD0_AIN2_OPAMP_GAIN 28
-#define LOC_BOARD1_AIN1_OPAMP_GAIN 32
-#define LOC_BOARD1_AIN2_OPAMP_GAIN 36
+// BOARD0 CONTENT_LENGTH bytes starting at CONTENT_START
+#define LOC_BOARD0_AIN1_OFFSET (CONTENT_START)
+#define LOC_BOARD0_AIN2_OFFSET (CONTENT_START+4)
+#define LOC_BOARD0_AIN1_OPAMP_GAIN (CONTENT_START+8)
+#define LOC_BOARD0_AIN2_OPAMP_GAIN (CONTENT_START+12)
+#define LOC_BOARD0_AIN1_GAIN (CONTENT_START+16)
+#define LOC_BOARD0_AIN2_GAIN (CONTENT_START+17)
+// BOARD1 CONTENT_LENGTH bytes starting at CONTENT_START+32
+#define LOC_BOARD1_AIN1_OFFSET (CONTENT_START+32)
+#define LOC_BOARD1_AIN2_OFFSET (CONTENT_START+32+4)
+#define LOC_BOARD1_AIN1_OPAMP_GAIN (CONTENT_START+32+8)
+#define LOC_BOARD1_AIN2_OPAMP_GAIN (CONTENT_START+32+12)
+#define LOC_BOARD1_AIN1_GAIN (CONTENT_START+32+16)
+#define LOC_BOARD1_AIN2_GAIN (CONTENT_START+32+17)
+
 // number of items that will appear in the configuration menu
 #define NUM_CONFIG_ITEMS 12
 
@@ -124,10 +126,10 @@ char cfg_text[NUM_CONFIG_ITEMS][48] = {"Board #0 0V Offset for AIN1 (V)",
                          "Board #0 0V Offset for AIN2 (V)",
                          "Board #1 0V Offset for AIN1 (V)",
                          "Board #1 0V Offset for AIN2 (V)",
-                         "Board #0 Gain code for AIN1 (0-7)",
-                         "Board #0 Gain code for AIN2 (0-7)",
-                         "Board #1 Gain code for AIN1 (0-7)",
-                         "Board #1 Gain code for AIN2 (0-7)",
+                         "Board #0 ADC Gain code for AIN1 (0-7)",
+                         "Board #0 ADC Gain code for AIN2 (0-7)",
+                         "Board #1 ADC Gain code for AIN1 (0-7)",
+                         "Board #1 ADC Gain code for AIN2 (0-7)",
                          "Board #0 Opamp Gain value for AIN1",
                          "Board #0 Opamp Gain value for AIN2",
                          "Board #1 Opamp Gain value for AIN1",
@@ -142,27 +144,31 @@ uint16_t cfg_loc[NUM_CONFIG_ITEMS]= {LOC_BOARD0_AIN1_OFFSET, LOC_BOARD0_AIN2_OFF
 
 // ************ global variables ****************
 i2c_inst_t *i2c_port;
+uint8_t config_times = 0; // used to print a banner
 uint8_t adc16Installed[2];
 uint8_t adc_confreg[2][2]; // config register for ADC
 uint8_t adc_data_rate[2] = {DR_128, DR_128};
-uint8_t adc_gain_bits[2] = {GAIN_2_048, GAIN_2_048}; // +/- 2.048V
-double adc_range[2] = {2.048, 2.048};
-double opamp_gain[2] = {0.38298, 0.38298}; // depends on opamp gain resistor values
-
+uint8_t adc_gain_bits[2][2] = {{GAIN_2_048, GAIN_2_048}, /* BOARD0 */
+                               {GAIN_2_048, GAIN_2_048}}; /* BOARD1 */
+double adc_range[2][2] = {{2.048, 2.048}, /* BOARD0 */
+                          {2.048, 2.048}}; /* BOARD1 */
+double opamp_gain[2][2] = {{0.38298, 0.38298}, /* BOARD0 */
+                           {0.38298, 0.38298}}; /* BOARD1 */
+int eeprom_sanity = 1; // this gets set to 0 if the EEPROM configuration looks bad
 
 // ************ function prototypes *************
 void adc_init(void); // initializes both ADC boards if present
 void build_cont_conversion(uint8_t boardnum); // sets up the local config for continuous conversion
 void build_single_conversion(uint8_t boardnum); // sets up the local config for single-shot conversion
 void build_data_rate(uint8_t boardnum, uint8_t dr); // sets up the local config for data rate (e.g. DR_128)
-void build_gain(uint8_t boardnum, uint8_t gain); // sets up the local config for gain (e.g. GAIN_2_048)
+void build_gain(uint8_t boardnum, uint8_t chan, uint8_t gain); // sets up the local config for gain (e.g. GAIN_2_048)
 // adc_set_mux: programs the config and sets the channel (e.g. AIN1) and also starts the conversion
 // if in continuous mode. Note: first result after changing mux in continuous mode will be invalid
 // returns 0 if the ADC board was not installed. If do_single_conversion is 1, then the ADC is
 // set to single-shot mode, and the conversion is started.
 int adc_set_mux(uint8_t boardnum, uint8_t chan, uint8_t do_single_conversion);
 int16_t adc_raw_diff_result(uint8_t boardnum); // returns the raw differential result (16-bit signed integer)
-double to_volts(uint8_t boardnum, int16_t raw); // converts the raw result to volts
+double to_volts(uint8_t boardnum, uint8_t chan, int16_t raw); // converts the raw result to volts
 // EEPROM functions: dev_addr is the I2C address 0x50 (EEPROM_I2C_ADDR) for CAT24AA01
 // mem_addr is the EEPROM memory address (0-127).
 // page_addr is the EEPROM page address (0-7), corresponding to the 8 pages of 16 bytes each.
@@ -176,6 +182,7 @@ uint8_t eeprom_byte_read(uint8_t dev_addr, uint8_t mem_addr); // reads a single 
 double eeprom_read_double(uint8_t dev_addr, uint8_t mem_addr); // reads a double from EEPROM
 float eeprom_read_float(uint8_t dev_addr, uint8_t mem_addr); // reads a float from EEPROM
 void eeprom_sequential_read(uint8_t dev_addr, uint8_t mem_addr, uint8_t* data, uint8_t datalen);
+void eeprom_zeroise(uint8_t dev_addr); // writes 0xff to all EEPROM locations
 void startup_button_action(uint8_t startup_button_state); // used to quickly store 0V offsets in EEPROM
 
 // ********** functions *************************
@@ -192,10 +199,78 @@ sleep_sec(uint32_t s) {
     sleep_ms(s * 1000);
 }
 
+// cfg_quick_sanity_check: checks the EEPROM for a basic determination if the values look wildly wrong
+// returns 1 if the values look OK, 0 if they look wrong. If fix is 1, then some initial sane-ish values
+// are written to the EEPROM.
+int cfg_quick_sanity_check(uint8_t boardnum, uint8_t fix) {
+    int sane_status = 1; // assume sanity
+    float float_val;
+    int board_offset = boardnum * CONTENT_LENGTH;
+    // check the 0V offsets for AIN1 and AIN2. Anything more than +- 0.1V is extremely unhealthy!
+    float_val = eeprom_read_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_OFFSET+board_offset);
+    if (float_val < -0.1 || float_val > 0.1) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_write_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_OFFSET+board_offset, 0.0);
+        }
+    }
+    float_val = eeprom_read_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_OFFSET+board_offset);
+    if (float_val < -0.1 || float_val > 0.1) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_write_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_OFFSET+board_offset, 0.0);
+        }
+    }
+    // check the ADC gain settings. They must be 0-7, since that's what the ADS1115 supports.
+    if (eeprom_byte_read(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_GAIN+board_offset) > 7) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_byte_write(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_GAIN+board_offset, adc_gain_bits[boardnum][AIN1]);
+        }
+    }
+    if (eeprom_byte_read(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_GAIN+board_offset) > 7) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_byte_write(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_GAIN+board_offset, adc_gain_bits[boardnum][AIN2]);
+        }
+    }
+    // check the op-amp gain settings. Lets assume the value must be between 0.01 and 1000.
+    float_val = eeprom_read_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_OPAMP_GAIN+board_offset);
+    if (float_val < 0.01 || float_val > 1000.0) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_write_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN1_OPAMP_GAIN+board_offset, opamp_gain[boardnum][AIN1]);
+        }
+    }
+    float_val = eeprom_read_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_OPAMP_GAIN+board_offset);
+    if (float_val < 0.01 || float_val > 1000.0) {
+        sane_status = 0;
+        if (fix) {
+            eeprom_write_float(EEPROM_I2C_ADDR, LOC_BOARD0_AIN2_OPAMP_GAIN+board_offset, opamp_gain[boardnum][AIN2]);
+        }
+    }
+    return sane_status;
+}
+
 // Configuration menu related functions
 void print_cfg_menu(void) {
     int i;
+    if (config_times<2) {
+        printf("  _____             __ _       _           _      \n"
+               " / ____|           / _(_)     | |         (_)     \n"
+               "| |     ___  _ __ | |_ _  __ _| |     __ _ _ _ __ \n"
+               "| |    / _ \\| '_ \\|  _| |/ _` | |    / _` | | '__|\n"
+               "| |___| (_) | | | | | | | (_| | |___| (_| | | |   \n"
+               " \\_____\\___/|_| |_|_| |_|\\__, |______\\__,_|_|_|   \n"
+               "                          __/ |                   \n"
+               "                         |___/                    \n");
+    config_times++;
+    }
     printf("\nConfiguration Menu:\n");
+    if (eeprom_sanity==0) {
+        printf("EEPROM sanity check failed at startup.\n");
+        printf("EEPROM was fresh, or corrupted\n");
+    }
     for (i=0; i<NUM_CONFIG_ITEMS; i++) {
         printf("(%c) %s ", i+'a', cfg_text[i]);
         if (cfg_type[i] == CONTENT_BYTE) {
@@ -208,7 +283,10 @@ void print_cfg_menu(void) {
             printf("\nprint_cfg_menu internal error, unknown type\n");
         }
     }
-    printf("press a key (a-%c) or 'x' to exit: ", 'a'+NUM_CONFIG_ITEMS-1);
+    // extra options
+    printf("(Z) (upper-case Z) Zeriose EEPROM\n");
+    printf("(x) Exit\n");
+    printf("press a key selection: ");
 }
 char check_for_keypress(void) {
     int c;
@@ -324,13 +402,17 @@ void cfg_menu(void) {
         if (c) {
             // OK a key was pressed. Handle it.
             printf("%c\n", c);
-            printf("Enter new value: ");
             if (c == 'x') {
                 printf("Exiting config menu\n");
                 not_finished = 0;
             } else if ((c==' ') | (c=='\n') | (c=='\r')) {
                 // re-print the menu
                 print_cfg_menu();
+            } else if (c == 'Z') {
+                printf("Zeroising EEPROM\n");
+                eeprom_zeroise(EEPROM_I2C_ADDR);
+                printf("Done.\n");
+                printf("press a key selection: ");
             } else {
                 // was the selection invalid?
                 i = c - 'a';
@@ -339,6 +421,7 @@ void cfg_menu(void) {
                     continue;
                 }
                 // a menu item was definitely selected
+                printf("Enter new value: ");
                 switch(cfg_type[i]) {
                     case CONTENT_BYTE:
                         v_byte = wait_byte_entry();
@@ -380,6 +463,7 @@ void cfg_menu(void) {
                         printf("Internal error on cfg_type!\n");
                         break;
                 }
+                printf("press a key selection: ");
             }
         } // keep checking for keypress
     } // end while(not_finished)
@@ -402,13 +486,13 @@ void build_data_rate(uint8_t boardnum, uint8_t dr) {
     adc_confreg[boardnum][1] &= ~0xE0; // clear the DR bits
     adc_confreg[boardnum][1] |= (dr<<5); // set the DR bits
 }
-void build_gain(uint8_t boardnum, uint8_t gain) {
+void build_gain(uint8_t boardnum, uint8_t chan, uint8_t gain) {
     if (gain > 5) {
         printf("build_gain: invalid gain\n");
         return;
     }
-    adc_range[boardnum] = adc_range_value[gain];
-    adc_gain_bits[boardnum] = gain;
+    adc_range[boardnum][chan] = adc_range_value[gain];
+    adc_gain_bits[boardnum][chan] = gain;
     adc_confreg[boardnum][0] &= ~0x0E; // clear the PGA bits
     adc_confreg[boardnum][0] |= (gain<<1); // set the PGA bits
 }
@@ -479,10 +563,10 @@ int16_t adc_raw_diff_result(uint8_t boardnum) {
     return(meas);
 }
 
-double to_volts(uint8_t boardnum, int16_t raw) {
+double to_volts(uint8_t boardnum, uint8_t chan, int16_t raw) {
     double v;
-    v = (double)raw * (adc_range[boardnum] / 32768.0); // convert the raw value to volts present at the ADC input
-    v = v / opamp_gain[boardnum]; // adjust for opamp gain
+    v = (double)raw * (adc_range[boardnum][chan] / 32768.0); // convert the raw value to volts present at the ADC input
+    v = v / opamp_gain[boardnum][chan]; // adjust for opamp gain
     return(v);
 }
 
@@ -580,6 +664,34 @@ void eeprom_sequential_read(uint8_t dev_addr, uint8_t mem_addr, uint8_t* data, u
     i2c_read_blocking(i2c_port, dev_addr, data, datalen, false);
 }
 
+void eeprom_zeroise(uint8_t dev_addr) {
+    uint8_t buf[EEPROM_PAGE_SIZE];
+    uint8_t i;
+    for (i=0; i<EEPROM_PAGE_SIZE; i++) {
+        buf[i] = 0xff;
+    }
+    for (i=0; i<EEPROM_PAGE_COUNT; i++) {
+        eeprom_page_write(dev_addr, i, buf, EEPROM_PAGE_SIZE);
+    }
+}
+
+int startup_button_scan() {
+    int res;
+    // check to see if a certain button was pressed on startup
+    // we need to configure any buttons needed to do that.
+    gpio_init(BTN_EURO);
+    gpio_set_dir(BTN_EURO, GPIO_IN);
+    gpio_set_pulls(BTN_EURO, true, false); // pullup enabled
+    gpio_init(BTN_DISP_Y);
+    gpio_set_dir(BTN_DISP_Y, GPIO_IN);
+    gpio_set_pulls(BTN_DISP_Y, true, false); // pullup enabled
+    if (PRESSED(BTN_EURO)) {
+        res = 1;
+    } else if (PRESSED(BTN_DISP_Y)) {
+        res = 2;
+    }
+    return(res);
+}
 
 void startup_button_action(uint8_t startup_button_state) {
     int chan_index;
@@ -600,6 +712,8 @@ void startup_button_action(uint8_t startup_button_state) {
 // board initialisation
 void
 board_init(void) {
+    int i;
+    int sanity;
     // I2C init
     if (I2C_PORT_SELECTED == 0) {
         i2c_port = &i2c0_inst;
@@ -621,9 +735,18 @@ board_init(void) {
         gpio_pull_up(I2C_SCL1_PIN);
     }
 
-    // initialize the ADC board(s)
+    // check what ADC boards are installed, and initialize them
     adc_init();
 
+    // sanity-check the EEPROM, and correct if necessary
+    for (i=0; i<2; i++) {
+        if (adc16Installed[i]) {
+            sanity = cfg_quick_sanity_check(i, 1); // 1 = fix errors
+            if (sanity == 0) {
+                eeprom_sanity = 0;
+            }
+        }
+    }
 }
 
 
@@ -635,19 +758,10 @@ int main(void) {
     int16_t raw[2][2];
     double v[2][2];
     stdio_init_all();
-    // check to see if a certain button was pressed on startup
-    // we need to configure any buttons needed to do that.
-    gpio_init(BTN_EURO);
-    gpio_set_dir(BTN_EURO, GPIO_IN);
-    gpio_set_pulls(BTN_EURO, true, false); // pullup enabled
-    gpio_init(BTN_DISP_Y);
-    gpio_set_dir(BTN_DISP_Y, GPIO_IN);
-    gpio_set_pulls(BTN_DISP_Y, true, false); // pullup enabled
-    if (PRESSED(BTN_EURO)) {
-        startup_button_state = 1;
-    } else if (PRESSED(BTN_DISP_Y)) {
-        startup_button_state = 2;
-    }
+
+    // check if any button is held down at startup
+    startup_button_state = startup_button_scan();
+
     sleep_ms(3000); // could remove this after debugging, or keep it in
 
     print_title(); // print welcome on USB UART or Serial UART (selected in CMakelists.txt)
@@ -658,7 +772,8 @@ int main(void) {
     // (using adc_set_mux)
     for (board_index = 0; board_index < 2; board_index++) {
         build_data_rate(board_index, DR_128);
-        build_gain(board_index, GAIN_2_048); // +- 2.048V
+        build_gain(board_index, AIN1, GAIN_2_048); // +- 2.048V
+        build_gain(board_index, AIN2, GAIN_2_048); // +- 2.048V
     }
 
     startup_button_action(startup_button_state); // action any button that was pressed at startup
@@ -680,8 +795,8 @@ int main(void) {
         // ok now we have up to 4 raw values, convert them to volts
         for (board_index = 0; board_index < 2; board_index++) {
             if (adc16Installed[board_index]) {
-                v[board_index][AIN1] = to_volts(board_index, raw[board_index][AIN1]);
-                v[board_index][AIN2] = to_volts(board_index, raw[board_index][AIN2]);
+                v[board_index][AIN1] = to_volts(board_index, AIN1, raw[board_index][AIN1]);
+                v[board_index][AIN2] = to_volts(board_index, AIN2, raw[board_index][AIN2]);
                 printf("Board%d: AIN1 = %.3f V, AIN2 = %.3f V\n", board_index, v[board_index][AIN1], v[board_index][AIN2]);
             }
         }
