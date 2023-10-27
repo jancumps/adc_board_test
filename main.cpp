@@ -108,10 +108,14 @@
 // number of items that will appear in the configuration menu
 #define NUM_CONFIG_ITEMS 12
 
-
-
-// Temperature sensor (STS40) definitions
-// If two ADC boards are installed then one temperature sensor needs to be removed.
+// Temperature sensor (STS40) definitions. Note: SHT40 may likely be compatible too.
+// If two ADC boards are installed then one temperature sensor needs to be removed or changed for one with a
+// different address.
+// STS40-AD / SHT40-AD I2C address is 0x44
+// STS40-BD / SHT40-BD I2C address is 0x45
+// STS40-CD / SHT40-CD I2C address is 0x46
+#define TEMP_SENSOR_I2C_ADDR 0x46
+#define TEMP_MEAS_TIME_MS 10
 
 // misc
 #define FOREVER 1
@@ -199,9 +203,29 @@ sleep_sec(uint32_t s) {
     sleep_ms(s * 1000);
 }
 
+// start temperature measurement. Wait 10 msec before reading the result.
+void start_temp_meas(void) {
+    uint8_t buf;
+    buf = 0xFD; // hi-res measurement command
+    i2c_write_blocking(i2c_port, TEMP_SENSOR_I2C_ADDR, &buf, 1, false);
+}
+
+// read temperature measurement
+float read_temp_degc(void) {
+    uint8_t buf[3];
+    uint16_t raw;
+    float degc;
+    i2c_read_blocking(i2c_port, TEMP_SENSOR_I2C_ADDR, buf, 3, false);
+    raw = buf[0] << 8 | buf[1];
+    degc = ((float)raw) / 65535.0;
+    degc = degc * 175.0 - 45.0;
+    return degc;
+}
+
 // cfg_quick_sanity_check: checks the EEPROM for a basic determination if the values look wildly wrong
 // returns 1 if the values look OK, 0 if they look wrong. If fix is 1, then some initial sane-ish values
-// are written to the EEPROM.
+// are written to the EEPROM. An example use of this function is to automatically recognize that the
+// EEPROM is fresh and populate it with defaults. Any checksums or magic numbers could be implemented here too.
 int cfg_quick_sanity_check(uint8_t boardnum, uint8_t fix) {
     int sane_status = 1; // assume sanity
     float float_val;
@@ -676,7 +700,7 @@ void eeprom_zeroise(uint8_t dev_addr) {
 }
 
 int startup_button_scan() {
-    int res;
+    int res = 0;
     // check to see if a certain button was pressed on startup
     // we need to configure any buttons needed to do that.
     gpio_init(BTN_EURO);
@@ -755,8 +779,10 @@ int main(void) {
     int startup_button_state = 0;
     int chan_index;
     int board_index;
+    uint16_t msec_count = 0;
     int16_t raw[2][2];
     double v[2][2];
+    float temp_degc;
     stdio_init_all();
 
     // check if any button is held down at startup
@@ -779,7 +805,16 @@ int main(void) {
     startup_button_action(startup_button_state); // action any button that was pressed at startup
 
 
+    // read temperature to populate the temp_degc variable
+    start_temp_meas();
+    sleep_ms(TEMP_MEAS_TIME_MS+1);
+    temp_degc = read_temp_degc();
+    sleep_ms(2); // need a small separation for I2C commands to the temp sensor
+
     while (FOREVER) {
+        if (msec_count == 0) {
+            start_temp_meas();
+        }
         // read AIN1 for both boards, then read AIN2 for both boards:
         for (chan_index = 0; chan_index < 2; chan_index++) {
             // select the channel for the conversions
@@ -789,15 +824,23 @@ int main(void) {
             // assume for now that both boards are using the same data rate!
             sleep_ms(conv_time_ms[adc_data_rate[BOARD0]]);
             sleep_ms(5); // wait a little longer for margin
+            msec_count += conv_time_ms[adc_data_rate[BOARD0]];
+            msec_count += 5;
             raw[BOARD0][chan_index] = adc_raw_diff_result(BOARD0); // read the conversion result for board 0
             raw[BOARD1][chan_index] = adc_raw_diff_result(BOARD1); // read the conversion result for board 1
+        }
+        if (msec_count >= TEMP_MEAS_TIME_MS+1) {
+            // read the temperature
+            temp_degc = read_temp_degc();
+            msec_count = 0;
         }
         // ok now we have up to 4 raw values, convert them to volts
         for (board_index = 0; board_index < 2; board_index++) {
             if (adc16Installed[board_index]) {
                 v[board_index][AIN1] = to_volts(board_index, AIN1, raw[board_index][AIN1]);
                 v[board_index][AIN2] = to_volts(board_index, AIN2, raw[board_index][AIN2]);
-                printf("Board%d: AIN1 = %.3f V, AIN2 = %.3f V\n", board_index, v[board_index][AIN1], v[board_index][AIN2]);
+                printf("Board%d: AIN1 = %.3f V, AIN2 = %.3f V, boardTemp = %.2f degC\n",
+                       board_index, v[board_index][AIN1], v[board_index][AIN2], temp_degc);
             }
         }
         sleep_ms(500);
