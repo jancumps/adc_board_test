@@ -31,8 +31,9 @@
 // set this value to 0 or 1 depending on 0-ohm resistor positions on ADC board.
 // set the value to 0 if the resistors are at the I2C0 labeled position,
 // set the value to 1 if the resistors are at the unlabeled position (which will be I2C1)
+// if the user did not set a sselection, select I2C1 (shabaz solder instructions default)
 #ifndef I2C_PORT_SELECTED
-#define I2C_PORT_SELECTED 0
+#define I2C_PORT_SELECTED 1
 #endif // I2C_PORT_SELECTED
 // these pins are supported by the ADC board:
 #define I2C_SDA0_PIN 4
