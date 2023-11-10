@@ -22,6 +22,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         hardware_i2c
         )
 
+# if environment variable I2C_PORT_SELECTED declared, pass it on to the compiler
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE I2C_PORT_SELECTED=$ENV{I2C_PORT_SELECTED})
+
 # adjust to enable stdio via usb, or uart
 pico_enable_stdio_usb(${CMAKE_PROJECT_NAME} 1)
 pico_enable_stdio_uart(${CMAKE_PROJECT_NAME} 0)
