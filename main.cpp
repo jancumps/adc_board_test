@@ -609,8 +609,7 @@ void adc_init(void) {
     for (i=0; i<2; i++) { // test both board I2C addresses
         buf[0] = ADS1115_REG_CONFIG;
         i2c_write_blocking(i2c_port, adc_addr[i], buf, 1, false);
-        i2c_read_blocking(i2c_port, adc_addr[i], buf, 2, false);
-        if (buf[0] != 0x85 || buf[1] != 0x83) {
+        if (i2c_read_blocking(i2c_port, adc_addr[i], buf, 2, false) == PICO_ERROR_GENERIC) { 
             adc16Installed[i] = 0; // no chip found
         } else {
             adc16Installed[i] = 1; // chip found!
