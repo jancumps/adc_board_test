@@ -154,7 +154,7 @@ i2c_inst_t *i2c_port;
 uint8_t config_times = 0; // used to print a banner
 uint8_t adc16Installed[2];
 uint8_t adc_confreg[2][2]; // config register for ADC
-uint8_t adc_data_rate[2] = {DR_128, DR_128};
+uint8_t adc_data_rate[2] = {DR_860, DR_860};
 uint8_t adc_gain_bits[2][2] = {{GAIN_2_048, GAIN_2_048}, /* BOARD0 */
                                {GAIN_2_048, GAIN_2_048}}; /* BOARD1 */
 double adc_range[2][2] = {{2.048, 2.048}, /* BOARD0 */
@@ -748,7 +748,7 @@ board_init(void) {
         i2c_port = &i2c1_inst;
         printf("board_init: using I2C1 sda=GP%d, scl=GP%d\n", I2C_SDA1_PIN, I2C_SCL1_PIN);
     }
-    i2c_init(i2c_port, 1E5);// 100kHz I2C clock
+    i2c_init(i2c_port, 1000*1000);// 1 MHz I2C clock
     if (I2C_PORT_SELECTED == 0) {
         gpio_set_function(I2C_SDA0_PIN, GPIO_FUNC_I2C);
         gpio_set_function(I2C_SCL0_PIN, GPIO_FUNC_I2C);
@@ -799,7 +799,7 @@ int main(void) {
     // these will be sent to the ADC board when the channel is selected
     // (using adc_set_mux)
     for (board_index = 0; board_index < 2; board_index++) {
-        build_data_rate(board_index, DR_128);
+        build_data_rate(board_index, DR_860);
         build_gain(board_index, AIN1, GAIN_2_048); // +- 2.048V
         build_gain(board_index, AIN2, GAIN_2_048); // +- 2.048V
     }
