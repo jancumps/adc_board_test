@@ -20,6 +20,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
 target_link_libraries(${CMAKE_PROJECT_NAME} 
         pico_stdlib
         hardware_i2c
+        hardware_irq
         )
 
 # if environment variable I2C_PORT_SELECTED declared, pass it on to the compiler
