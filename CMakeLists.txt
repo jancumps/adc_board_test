@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
+
+set(CMAKE_CXX_STANDARD 23)
+
 include(pico_sdk_import.cmake)
 # uncomment the following line if using a Pico W board
 set(PICO_BOARD pico_w)
@@ -12,9 +15,11 @@ pico_sdk_init()
 # rest of your project
 add_executable(${CMAKE_PROJECT_NAME}
         main.cpp
+        ads1115.cpp
         )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}
         )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 
