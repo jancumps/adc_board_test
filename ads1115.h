@@ -82,7 +82,7 @@ public:
     void bulk_read(uint16_t* buf, size_t len);
 
     void start_single_conversion();
-    int16_t adc_raw_diff_result();
+    uint16_t adc_raw_diff_result();
 
     // convert the raw value to volts present at the ADC input
     // adjust for opamp gain
