@@ -83,7 +83,6 @@ void board_init() {
 
 // ************ main function *******************
 int main(void) {
-    uint16_t buf[SAMPLES];
 
     stdio_init_all();
     board_init();
@@ -99,6 +98,8 @@ int main(void) {
     ads.build_cont_conversion();
     ads.adc_set_mux(ads1115::channel::CH_AIN1, false);
 
+    uint16_t buf[SAMPLES];
+
     ads.adc_enable_ready();
     ads.set_data_ready(false);
     ads.bulk_read(buf, sizeof buf);
@@ -111,7 +112,7 @@ int main(void) {
     // statistics. Prereq: bytes are already swapped
 
     // average
-    uint8_t average = std::accumulate(std::begin(buf), std::end(buf), 0.0) / std::size(buf);
+    uint16_t average = std::accumulate(std::begin(buf), std::end(buf), 0.0) / std::size(buf);
     printf("AVG = %.7f V\n", ads.to_volts(ads1115::channel::CH_AIN1, average));
     // min and max
     auto minmax = std::minmax_element(std::begin(buf), std::end(buf));

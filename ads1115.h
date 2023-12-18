@@ -86,8 +86,8 @@ public:
 
     // convert the raw value to volts present at the ADC input
     // adjust for opamp gain
-    inline double to_volts(channel chan, int16_t raw) {
-        return (double)(raw * (adc_range[(uint8_t)chan] / 32768.0)) / opamp_gain[(uint8_t)chan];
+    inline double to_volts(channel chan, uint16_t raw) {
+        return (double)(((int16_t)raw) * (adc_range[(uint8_t)chan] / 32768.0)) / opamp_gain[(uint8_t)chan];
     }
 };
 
