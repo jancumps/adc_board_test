@@ -62,6 +62,18 @@ private:
     double adc_range_value[8] = {6.144, 4.096, 2.048, 1.024, 0.512, 0.256};
     double opamp_gain[2] = {0.38298, 0.38298};
 
+    // safe conversions, only available within the class implementation
+    inline uint8_t operator()(addr a) const {return static_cast<uint32_t>(a);}
+    inline addr operator()(uint8_t a) const {
+        assert(a >= (*this)(addr::A_0) && a < (*this)(addr::A_LAST)); // debug support
+        return  static_cast<addr>(a);
+    }
+    inline uint8_t operator()(reg r) const {return static_cast<uint32_t>(r);}
+    inline uint8_t operator()(data_rate dr) const {return static_cast<uint32_t>(dr);}
+    inline uint8_t operator()(gain g) const {return static_cast<uint32_t>(g);}
+    inline uint8_t operator()(channel c) const {return static_cast<uint32_t>(c);}
+    inline uint8_t operator()(diff d) const {return static_cast<uint32_t>(d);}
+
 public:
     ads1115() : data_ready(false), i2c_port(nullptr), address(addr::A_LAST), dr(data_rate::DR_860) {}
 

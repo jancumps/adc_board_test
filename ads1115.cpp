@@ -4,12 +4,12 @@
 bool ads1115::init(i2c_inst_t *i2c_port) { 
     bool found = false;
     uint8_t u;
-    uint8_t buf[3] = {(uint8_t)reg::REG_CONFIG};
+    uint8_t buf[3] = {(*this)(reg::REG_CONFIG)};
     // is the ADC chip installed?
-    for (u = (uint8_t)addr::A_0; u < (uint8_t)addr::A_LAST; u++) { // test both board I2C addresses
+    for (u = (*this)(addr::A_0); u < (*this)(addr::A_LAST); u++) { // test both board I2C addresses
         i2c_write_blocking(i2c_port, u, buf, 1, false);
         if (i2c_read_blocking(i2c_port, u, buf, 2, false) != PICO_ERROR_GENERIC) { 
-            found = ads1115::init(i2c_port, (addr)u); // chip found!
+            found = ads1115::init(i2c_port, (*this)(u)); // chip found!
             break;
         }
     }
@@ -29,14 +29,14 @@ bool ads1115::init(i2c_inst_t *i2c_port, addr address) {
 void ads1115::build_data_rate(data_rate dr) {
     this->dr = dr;
     adc_confreg[1] &= ~0xE0; // clear the DR bits
-    adc_confreg[1] |= ((uint8_t)dr << 5); // set the DR bits
+    adc_confreg[1] |= ((*this)(dr) << 5); // set the DR bits
 }
 
 void ads1115::build_gain(channel chan, gain gain) {
-    adc_range[(uint8_t)chan] = adc_range_value[(uint8_t)gain];
-    adc_gain_bits[(uint8_t)chan] = gain;
+    adc_range[(*this)(chan)] = adc_range_value[(*this)(gain)];
+    adc_gain_bits[(*this)(chan)] = gain;
     adc_confreg[0] &= ~0x0E; // clear the PGA bits
-    adc_confreg[0] |= ((uint8_t)gain << 1); // set the PGA bits
+    adc_confreg[0] |= ((*this)(gain) << 1); // set the PGA bits
 }
 
 void ads1115::build_cont_conversion() {
@@ -55,22 +55,22 @@ void ads1115::adc_set_mux(channel chan, bool do_single_conversion) {
     uint8_t buf[3];
     switch(chan) {
         case channel::CH_AIN1:
-            mux = (uint8_t)diff::DIFF_0_1;
+            mux = (*this)(diff::DIFF_0_1);
             break;
         case channel::CH_AIN2:
-            mux = (uint8_t)diff::DIFF_2_3;
+            mux = (*this)(diff::DIFF_2_3);
             break;
     }
     adc_confreg[0] &= ~0x70; // clear the MUX bits
     adc_confreg[0] |= (mux << 4); // set the MUX bits
-    buf[0] = (uint8_t)reg::REG_CONFIG;
+    buf[0] = (*this)(reg::REG_CONFIG);
     buf[1] = adc_confreg[0];
     buf[2] = adc_confreg[1];
     if (do_single_conversion) {
         buf[1] |= 0x01; // set MODE bit to single-shot mode
         buf[1] |= 0x80; // set START bit to start conversion
     }
-    i2c_write_blocking(i2c_port, (uint8_t)address, buf, 3, false);
+    i2c_write_blocking(i2c_port, (*this)(address), buf, 3, false);
 }
 
 void ads1115::adc_enable_ready() {
@@ -79,12 +79,12 @@ void ads1115::adc_enable_ready() {
     buf[0] = (uint8_t)reg::REG_LO_THRESH;
     buf[1] = 0x00;
     buf[2] = 0x00; //Lo_thresh MS bit must be 0
-    i2c_write_blocking(i2c_port, (uint8_t)address, buf, 3, false);
+    i2c_write_blocking(i2c_port, (*this)(address), buf, 3, false);
 
     buf[0] = (uint8_t)reg::REG_HI_THRESH;
     buf[1] = 0x80;
     buf[2] = 0x00; //Hi_thresh  MS bit must be 1
-    i2c_write_blocking(i2c_port, (uint8_t)address, buf, 3, false);
+    i2c_write_blocking(i2c_port, (*this)(address), buf, 3, false);
 }
 
 void ads1115::bulk_read(uint16_t* buf, size_t len) {
@@ -93,13 +93,13 @@ void ads1115::bulk_read(uint16_t* buf, size_t len) {
     uint8_t* end = ((uint8_t*)buf) + len;
 
     uint8_t reg = (uint8_t)reg::REG_CONVERSION;
-    i2c_write_blocking(i2c_port, (uint8_t)address, &reg, 1, false);
+    i2c_write_blocking(i2c_port, (*this)(address), &reg, 1, false);
 
     set_data_ready(false);
     while (begin < end) {
         if (is_data_ready()) {
             set_data_ready(false);
-            i2c_read_blocking(i2c_port, (uint8_t)address, begin, 2, false);
+            i2c_read_blocking(i2c_port, (*this)(address), begin, 2, false);
             begin += 2;
         }
     }
@@ -111,7 +111,7 @@ void ads1115::start_single_conversion() {
     buf[0] = (uint8_t)reg::REG_CONFIG;
     buf[1] = adc_confreg[0];
     buf[2] = adc_confreg[1];
-    i2c_write_blocking(i2c_port, (uint8_t)address, buf, 3, false);
+    i2c_write_blocking(i2c_port, (*this)(address), buf, 3, false);
 }
 
 // read the conversion register
@@ -120,7 +120,7 @@ uint16_t ads1115::adc_raw_diff_result() {
     uint16_t buf;
     uint8_t* buf8_ptr = (uint8_t*)&buf;
     *buf8_ptr = (uint8_t)reg::REG_CONVERSION;
-    i2c_write_blocking(i2c_port, (uint8_t)address, buf8_ptr, 1, false);
-    i2c_read_blocking(i2c_port, (uint8_t)address, buf8_ptr, 2, false);
+    i2c_write_blocking(i2c_port, (*this)(address), buf8_ptr, 1, false);
+    i2c_read_blocking(i2c_port, (*this)(address), buf8_ptr, 2, false);
     return(meas);
 }
