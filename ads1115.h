@@ -14,13 +14,6 @@ public:
         A_LAST
     };
 
-    enum class reg : uint8_t {
-        REG_CONVERSION = 0x00,
-        REG_CONFIG,
-        REG_LO_THRESH,
-        REG_HI_THRESH
-    };
-
     enum class data_rate : uint8_t {
         DR_8 = 0,
         DR_16,
@@ -46,12 +39,19 @@ public:
         CH_AIN2
     };
 
+private:
+    enum class reg : uint8_t {
+        REG_CONVERSION = 0x00,
+        REG_CONFIG,
+        REG_LO_THRESH,
+        REG_HI_THRESH
+    };
+
     enum class diff: uint8_t {
         DIFF_0_1 = 0x00,
         DIFF_2_3 = 0x03
     };
-
-private:
+    
     volatile bool data_ready;
     i2c_inst_t *i2c_port;
     addr address;
