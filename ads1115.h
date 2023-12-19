@@ -5,6 +5,7 @@
 #include "hardware/i2c.h"
 
 #include <algorithm>
+#include <span>
 
 class ads1115 {
 public:
@@ -93,6 +94,7 @@ public:
     void adc_set_mux(channel chan, bool do_single_conversion);
     void adc_enable_ready();
 
+    // get bulk samples by passing iterators to buffer
     template<typename Iterator> void bulk_read(Iterator begin,  Iterator end) {
         // defined in header: https://stackoverflow.com/questions/495021/why-can-templates-only-be-implemented-in-the-header-file
         uint8_t reg = (uint8_t)reg::REG_CONVERSION;
@@ -106,6 +108,12 @@ public:
             i2c_read_blocking(i2c_port, (*this)(address), reinterpret_cast<uint8_t *>(&u), 2, false);
         });
     }
+
+    // get bulk samples by passing a container (can be a C array)
+    void bulk_read(std::span<uint16_t> buf) {
+        bulk_read(buf.begin(), buf.end());
+    }
+
 
     void start_single_conversion();
     uint16_t adc_raw_diff_result();

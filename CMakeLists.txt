@@ -16,6 +16,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
         -Wno-unused-function 
         -Wno-maybe-uninitialized
+        -ggdb3
         -g3
     )
 endif ()
