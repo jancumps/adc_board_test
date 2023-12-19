@@ -48,7 +48,13 @@ ads1115 ads = ads1115();
 // ********** functions *************************
 
 void rdy_callback(uint gpio, uint32_t events) {
-    ads.set_data_ready(true);
+    switch (gpio) {
+        case ADC_RDY:
+            ads.set_data_ready(true);
+            break;
+        default:
+            break;
+    }
 }
 
 // board initialisation
@@ -78,7 +84,6 @@ void board_init() {
     gpio_pull_up(ADC_RDY);
     gpio_set_dir(ADC_RDY, false);
     gpio_set_irq_enabled_with_callback(ADC_RDY, GPIO_IRQ_EDGE_RISE, true, &rdy_callback);
-
 }
 
 // ************ main function *******************
