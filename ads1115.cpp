@@ -98,11 +98,10 @@ void ads1115::start_single_conversion() {
 
 // read the conversion register
 uint16_t ads1115::adc_raw_diff_result() {
-    uint16_t meas;
     uint16_t buf;
     uint8_t* buf8_ptr = (uint8_t*)&buf;
     *buf8_ptr = (uint8_t)reg::REG_CONVERSION;
     i2c_write_blocking(i2c_port, (*this)(address), buf8_ptr, 1, false);
     i2c_read_blocking(i2c_port, (*this)(address), buf8_ptr, 2, false);
-    return(meas);
+    return(buf);
 }

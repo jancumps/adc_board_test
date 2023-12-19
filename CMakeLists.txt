@@ -8,6 +8,19 @@ set(PICO_BOARD pico_w)
 # set the project name (change to suit)
 project(adc_board_test)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "  Diag: maximum debug info")
+    #I've set this to allow breakpoints on any source line
+    set(PICO_DEOPTIMIZED_DEBUG=1)
+    add_compile_options(-Wall
+        -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
+        -Wno-unused-function 
+        -Wno-maybe-uninitialized
+        -g3
+    )
+endif ()
+
+
 pico_sdk_init()
 
 # add_subdirectory()
