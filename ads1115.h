@@ -4,6 +4,8 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 
+#include <algorithm>
+
 class ads1115 {
 public:
     enum class addr : uint8_t {
@@ -91,9 +93,19 @@ public:
     void adc_set_mux(channel chan, bool do_single_conversion);
     void adc_enable_ready();
 
-    void bulk_read(uint16_t* buf, size_t len);
+    template<typename Iterator> void bulk_read(Iterator begin,  Iterator end) {
+        // defined in header: https://stackoverflow.com/questions/495021/why-can-templates-only-be-implemented-in-the-header-file
+        uint8_t reg = (uint8_t)reg::REG_CONVERSION;
+        i2c_write_blocking(i2c_port, (*this)(address), &reg, 1, false);
+        set_data_ready(false);
 
-    void bulk_read_2(uint16_t *begin, uint16_t *end);
+        std::for_each(begin, end, [this](uint16_t& u){ // capture "this", allows to call its methods
+            while(!is_data_ready()) {/* wait */ }
+            set_data_ready(false);
+            // need to cast the uint16_t to a buffer of 2 uint8_t
+            i2c_read_blocking(i2c_port, (*this)(address), reinterpret_cast<uint8_t *>(&u), 2, false);
+        });
+    }
 
     void start_single_conversion();
     uint16_t adc_raw_diff_result();

@@ -102,8 +102,7 @@ int main(void) {
 
     ads.adc_enable_ready();
     ads.set_data_ready(false);
-    // ads.bulk_read(buf, sizeof buf);
-    ads.bulk_read_2(std::begin(buf), std::end(buf));
+    ads.bulk_read(std::begin(buf), std::end(buf));
 
     // buffer bytes will now get swapped, 
     // and that's needed for the next actions
