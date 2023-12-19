@@ -1,5 +1,7 @@
 #include "ads1115.h"
 
+#include <Iterator>
+
 // configure for first found IC
 bool ads1115::init(i2c_inst_t *i2c_port) { 
     bool found = false;
@@ -103,6 +105,19 @@ void ads1115::bulk_read(uint16_t* buf, size_t len) {
             begin += 2;
         }
     }
+    printf("trad done");
+}
+
+void ads1115::bulk_read_2(uint16_t *begin, uint16_t *end) {
+    uint8_t reg = (uint8_t)reg::REG_CONVERSION;
+    i2c_write_blocking(i2c_port, (*this)(address), &reg, 1, false);
+    set_data_ready(false);
+
+    std::for_each(begin, end, [this](uint16_t& u){ // capture this, allows to call methods
+        while(!is_data_ready()) {/* wait */ }
+        set_data_ready(false);
+        i2c_read_blocking(i2c_port, (*this)(address), (uint8_t *)(&u), 2, false);
+    });
 }
 
 void ads1115::start_single_conversion() {

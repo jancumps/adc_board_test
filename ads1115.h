@@ -93,6 +93,8 @@ public:
 
     void bulk_read(uint16_t* buf, size_t len);
 
+    void bulk_read_2(uint16_t *begin, uint16_t *end);
+
     void start_single_conversion();
     uint16_t adc_raw_diff_result();
 
